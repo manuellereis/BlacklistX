@@ -1,14 +1,27 @@
 import cv2
-import numpy as np
 import face_recognition
-import sqlite3
-import pickle
+import os
 
-from database import ENGINE
+# Função para carregar todas as imagens de uma pasta e calcular suas codificações
+def load_known_faces(known_faces_dir):
+    known_encodings = []
+    known_names = []
 
-# Conectar ao banco de dados
-conn = ENGINE
-c = conn.cursor()
+    for filename in os.listdir(known_faces_dir):
+        if filename.endswith(('.jpg', '.jpeg', '.png')):  # Suporte a formatos de imagem
+            image_path = os.path.join(known_faces_dir, filename)
+            known_image = face_recognition.load_image_file(image_path)
+            known_encoding = face_recognition.face_encodings(known_image)
+            
+            if known_encoding:  # Verifica se a codificação foi encontrada
+                known_encodings.append(known_encoding[0])
+                known_names.append(os.path.splitext(filename)[0])  # Nome sem extensão
+
+    return known_encodings, known_names
+
+# Diretório com as imagens conhecidas
+known_faces_dir = "faces/"  # Substitua pelo caminho da sua pasta
+known_encodings, known_names = load_known_faces(known_faces_dir)
 
 # Iniciar a captura de vídeo
 cap = cv2.VideoCapture(0)
@@ -18,9 +31,6 @@ if not cap.isOpened():
     exit()
 
 print("Pressione 'q' para sair")
-
-# Defina um limite de distância para a comparação
-threshold = 0.6
 
 while True:
     ret, frame = cap.read()
@@ -33,32 +43,29 @@ while True:
     face_encodings = face_recognition.face_encodings(frame_rgb, face_locations)
 
     for (face_encoding, face_location) in zip(face_encodings, face_locations):
-        # Obter todos os rostos do banco de dados
-        c.execute("SELECT nome, encoding FROM usuarios")
-        usuarios = c.fetchall()
+        # Comparar com todos os rostos conhecidos
+        matches = face_recognition.compare_faces(known_encodings, face_encoding)
+        name = "Rosto Desconhecido"  # Nome padrão
 
-        name = "Desconhecido"
-        color = (0, 0, 255)  # Vermelho por padrão
-
-        for usuario in usuarios:
-            stored_name = usuario[0]
-            stored_encoding = pickle.loads(usuario[1])  # Carregar o encoding do banco de dados
-            face_distance = face_recognition.face_distance([stored_encoding], face_encoding)
-
-            if face_distance < threshold:  # Verifique se o rosto corresponde
-                name = stored_name
-                color = (0, 255, 0)  # Verde se reconhecido
-                break
+        # Se houver uma correspondência
+        if True in matches:
+            first_match_index = matches.index(True)
+            name = known_names[first_match_index]
+            color = (0, 255, 0)  # Verde para reconhecido
+        else:
+            color = (0, 0, 255)  # Vermelho para não reconhecido
 
         (top, right, bottom, left) = face_location
-        cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
-        cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2)
+        cv2.rectangle(frame, (left, top), (right, bottom), color, 2)  # Cor do retângulo
+        cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
 
-    cv2.imshow("Detecção de Faces em Tempo Real", frame)
+    # Mostrar o frame na janela
+    cv2.imshow('frame', frame)
 
+    # Verificar se a tecla 'q' foi pressionada
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
+# Liberar a captura e fechar as janelas
 cap.release()
-conn.close()
 cv2.destroyAllWindows()
