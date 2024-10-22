@@ -34,10 +34,10 @@ while True:
         is_match = face_distance < threshold
 
         if is_match[0]:  # Se a distância for menor que o threshold, reconhecido
-            name = "Reconhecido"
+            name = "Rosto suspeito!"
             color = (0, 255, 0)  # Verde
         else:
-            name = "Desconhecido"
+            name = "Rosto não suspeito"
             color = (0, 0, 255)  # Vermelho
 
         (top, right, bottom, left) = face_location
