@@ -1,0 +1,12 @@
+[project]
+name = "facialrecognition"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "face-recognition-models>=0.3.0",
+    "face-recognition>=1.3.0",
+    "ipykernel>=6.29.5",
+    "opencv-python>=4.10.0.84",
+]
