@@ -1,71 +1,57 @@
-import cv2
-import face_recognition
-import os
+from fastapi import FastAPI, File, Form, UploadFile
+from fastapi.responses import HTMLResponse  # Importando HTMLResponse para servir HTML
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import create_engine, Column, Integer, String, LargeBinary
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-# Função para carregar todas as imagens de uma pasta e calcular suas codificações
-def load_known_faces(known_faces_dir):
-    known_encodings = []
-    known_names = []
+# Configuração do banco de dados
+DATABASE_URL = "postgresql://postgres:root@localhost:5432/black_listix"
+engine = create_engine(DATABASE_URL, echo=True)  # echo=True para mostrar logs de SQL
+SessionLocal = sessionmaker(bind=engine)
+Base = declarative_base()
 
-    for filename in os.listdir(known_faces_dir):
-        if filename.endswith(('.jpg', '.jpeg', '.png')):  # Suporte a formatos de imagem
-            image_path = os.path.join(known_faces_dir, filename)
-            known_image = face_recognition.load_image_file(image_path)
-            known_encoding = face_recognition.face_encodings(known_image)
-            
-            if known_encoding:  # Verifica se a codificação foi encontrada
-                known_encodings.append(known_encoding[0])
-                known_names.append(os.path.splitext(filename)[0])  # Nome sem extensão
+# Modelo do banco de dados
+class Face(Base):
+    __tablename__ = "faces"
+    id_face = Column(Integer, primary_key=True, index=True)
+    name = Column(String, index=True)
+    image = Column(LargeBinary)
 
-    return known_encodings, known_names
+Base.metadata.create_all(bind=engine)
 
-# Diretório com as imagens conhecidas
-known_faces_dir = "faces/"  # Substitua pelo caminho da sua pasta
-known_encodings, known_names = load_known_faces(known_faces_dir)
+# Configuração do FastAPI
+app = FastAPI()
 
-# Iniciar a captura de vídeo
-cap = cv2.VideoCapture(0)
+# Monta o diretório "static" para servir arquivos estáticos (CSS, JS, etc.)
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
-if not cap.isOpened():
-    print("Erro ao acessar a câmera")
-    exit()
+# Rota para carregar o index.html como página principal
+@app.get("/", response_class=HTMLResponse)
+async def read_index():
+    try:
+        with open("static/index.html", "r") as f:  # Certifique-se que o index.html esteja no diretório correto
+            html_content = f.read()
+        return HTMLResponse(content=html_content)
+    except FileNotFoundError:
+        return HTMLResponse(content="<h1>Index file not found!</h1>", status_code=404)
 
-print("Pressione 'q' para sair")
+@app.post("/upload")
+async def upload_image(
+    name: str = Form(...),  # Recebe o nome como dado de formulário
+    image: UploadFile = File(...),  # Recebe a imagem como arquivo
+):
+    # Lê o conteúdo da imagem
+    image_content = await image.read()
 
-while True:
-    ret, frame = cap.read()
-    if not ret:
-        print("Não foi possível ler o frame")
-        break
-
-    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    face_locations = face_recognition.face_locations(frame_rgb)
-    face_encodings = face_recognition.face_encodings(frame_rgb, face_locations)
-
-    for (face_encoding, face_location) in zip(face_encodings, face_locations):
-        # Comparar com todos os rostos conhecidos
-        matches = face_recognition.compare_faces(known_encodings, face_encoding)
-        name = "Rosto Desconhecido"  # Nome padrão
-
-        # Se houver uma correspondência
-        if True in matches:
-            first_match_index = matches.index(True)
-            name = known_names[first_match_index]
-            color = (0, 255, 0)  # Verde para reconhecido
-        else:
-            color = (0, 0, 255)  # Vermelho para não reconhecido
-
-        (top, right, bottom, left) = face_location
-        cv2.rectangle(frame, (left, top), (right, bottom), color, 2)  # Cor do retângulo
-        cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
-
-    # Mostrar o frame na janela
-    cv2.imshow('frame', frame)
-
-    # Verificar se a tecla 'q' foi pressionada
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Liberar a captura e fechar as janelas
-cap.release()
-cv2.destroyAllWindows()
+    # Conexão com o banco de dados
+    db = SessionLocal()
+    try:
+        # Cria uma nova entrada na tabela faces
+        new_face = Face(name=name, image=image_content)
+        db.add(new_face)
+        db.commit()
+        db.refresh(new_face)
+        return {"message": "Image uploaded successfully", "face_id": new_face.id_face}
+    finally:
+        db.close()
