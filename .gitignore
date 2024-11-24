@@ -1,2 +1,4 @@
 # AMBIENT VARIABLES
 .env
+**/notebook/
+**/__pycache__/
