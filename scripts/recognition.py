@@ -11,7 +11,6 @@ load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Funções para banco de dados
 def get_image_from_db(face_id: int):
     conn = psycopg2.connect(DATABASE_URL)
     cursor = conn.cursor()
@@ -49,11 +48,9 @@ def register_face_in_db(face_id: int, ip_camera: str):
     cursor.close()
     conn.close()
 
-# Pré-carregamento das faces conhecidas
 print("Carregando faces conhecidas do banco de dados...")
 known_encodings, known_names = load_known_faces_from_db()
 
-# Inicializa a câmera
 cap = cv2.VideoCapture(0)
 if not cap.isOpened():
     print("Erro ao acessar a câmera")
@@ -89,12 +86,12 @@ while True:
     for (face_encoding, face_location) in zip(face_encodings, face_locations):
         matches = face_recognition.compare_faces(known_encodings, face_encoding)
         name = "Rosto Desconhecido"
-        color = (0, 0, 255)  # Vermelho para desconhecidos
+        color = (0, 0, 255)  
 
         if True in matches:
             first_match_index = matches.index(True)
             name = known_names[first_match_index]
-            color = (0, 255, 0)  # Verde para conhecidos
+            color = (0, 255, 0) 
 
             # Reconhecimento temporal
             current_time = time.time()
@@ -104,17 +101,14 @@ while True:
                 register_face_in_db(face_id=first_match_index + 1, ip_camera=ip_camera)
                 face_recognition_timestamps[name] = current_time
 
-        # Ajusta as coordenadas para o tamanho original
         (top, right, bottom, left) = [int(coord * 2) for coord in face_location]
         cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
         cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
 
-    # Exibe o frame com as detecções
     cv2.imshow('Reconhecimento Facial', frame)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
-# Libera a câmera e fecha janelas
 cap.release()
 cv2.destroyAllWindows()
