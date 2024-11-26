@@ -187,9 +187,9 @@
   
         const result = await response.json();
         if (response.ok) {
-          alert('Upload successful: ' + JSON.stringify(result));
+          alert('Upload successful');
         } else {
-          alert('Upload failed: ' + JSON.stringify(result));
+          alert('Upload failed');
         }
       } catch (error) {
         console.error('Error uploading:', error);
