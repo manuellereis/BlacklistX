@@ -51,7 +51,7 @@ def register_face_in_db(face_id: int, ip_camera: str):
 print("Carregando faces conhecidas do banco de dados...")
 known_encodings, known_names = load_known_faces_from_db()
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(2)
 if not cap.isOpened():
     print("Erro ao acessar a câmera")
     exit()
